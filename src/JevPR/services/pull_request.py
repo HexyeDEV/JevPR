@@ -14,6 +14,7 @@ from JevPR.github.client import GitHubClient
 from JevPR.providers.jev import JevProvider
 from JevPR.services.evaluation import EvaluationOutcome, EvaluationService
 
+
 logger = logging.getLogger(__name__)
 
 REVIEW_WORTHY_PR_ACTIONS = {"opened", "reopened", "synchronize", "ready_for_review"}
