@@ -58,3 +58,5 @@ In Docker mode, the app container uses `DATABASE_URL=postgresql+psycopg://jevpr:
 License: Apache-2.0
 
 Don't forget to leave a Star!
+
+This Project is Under Development and can contain bugs. Additionally Jev is an AI model, and can make mistakes.
