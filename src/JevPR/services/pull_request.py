@@ -14,6 +14,7 @@ from JevPR.github.client import GitHubClient
 from JevPR.providers.jev import JevProvider
 from JevPR.services.evaluation import EvaluationOutcome, EvaluationService\
 
+
 logger = logging.getLogger(__name__)
 
 REVIEW_WORTHY_PR_ACTIONS = {"opened", "reopened", "synchronize", "ready_for_review"}
@@ -168,7 +169,7 @@ Create one at `.github/jevpr.yml` in the repository to customize routing behavio
 Configuration Template:
 
 ```yaml
-    {settings.config_path.read_text(encoding="utf-8")}
+{settings.config_path.read_text(encoding="utf-8")}
 ```"""
 
     await github.create_issue_comment(
