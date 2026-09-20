@@ -4,7 +4,7 @@ import logging
 
 import httpx
 
-from JevPR.config import settings
+from JevPR.config import RoutingConfig, settings
 from JevPR.decisions.context import ChangedFile, PullRequestContext
 from JevPR.decisions.engine import JevDecisionEngine
 from JevPR.decisions.policy import RoutingAction
@@ -292,10 +292,11 @@ async def handle_pull_request_webhook(event_type: str, payload: dict) -> dict[st
     )
 
     engine = JevDecisionEngine(provider=JevProvider())
-    policy: RoutingPolicy = await settings.load_routing_config_from_repo(
+    config: RoutingConfig = await settings.load_routing_config_from_repo(
         owner=context.repository.split("/")[0],
         repo=context.repository.split("/")[1]
     )
+    policy: RoutingPolicy = RoutingPolicy(config)
     has_default_policy = policy == default_policy()
     service = EvaluationService(engine=engine, policy=policy)
     outcome: EvaluationOutcome = await service.evaluate(context)
