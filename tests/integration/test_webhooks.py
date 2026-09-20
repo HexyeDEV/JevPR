@@ -1,8 +1,10 @@
 from fastapi.testclient import TestClient
+import httpx
 
 import JevPR.api.webhook as webhook_module
 from JevPR.decisions.models import DecisionEvidence, DecisionResult, RiskSignals
 from JevPR.decisions.policy import RoutingAction
+from JevPR.services.evaluation import EvaluationOutcome
 from JevPR.services.pull_request import _build_route_comment
 
 from JevPR.main import create_app
@@ -107,6 +109,39 @@ def test_github_webhook_applies_routed_action(monkeypatch) -> None:
 
     applied_routes: list[dict[str, object]] = []
 
+    class _FakeGitHubClient:
+        async def list_pull_request_files(self, *, owner: str, repo: str, pull_number: int):
+            return [
+                {
+                    "filename": "src/app.py",
+                    "status": "modified",
+                    "additions": 4,
+                    "deletions": 1,
+                    "patch": "@@ -1 +1 @@",
+                }
+            ]
+
+    async def _fake_create_installation_client(payload):
+        return "octo", "repo", _FakeGitHubClient()
+
+    async def _fake_evaluate(self, context):
+        assert len(context.changed_files) == 1
+        return EvaluationOutcome(
+            decision=DecisionResult(
+                signals=RiskSignals(
+                    breaking_api_change=0.0,
+                    security_sensitive=0.0,
+                    production_infra_change=0.0,
+                    model_risk=0.0,
+                ),
+                computed_risk=0.0,
+                file_risks=[],
+                summary="summary",
+                evidence=[],
+            ),
+            route=RoutingAction(action="approve"),
+        )
+
     async def _fake_apply(payload, context, route, decision):
         applied_routes.append(
             {
@@ -117,6 +152,8 @@ def test_github_webhook_applies_routed_action(monkeypatch) -> None:
             }
         )
 
+    monkeypatch.setattr("JevPR.services.pull_request._create_installation_client", _fake_create_installation_client)
+    monkeypatch.setattr("JevPR.services.evaluation.EvaluationService.evaluate", _fake_evaluate)
     monkeypatch.setattr("JevPR.services.pull_request._apply_route_to_github", _fake_apply)
 
     client = TestClient(create_app())
@@ -178,3 +215,81 @@ def test_route_comment_includes_jev_breakdown() -> None:
     assert "Composite risk 7.25/10" in comment
     assert "Breaking API change: 1.00" in comment
     assert "Top risky files:" not in comment
+
+
+def test_request_review_422_is_logged_and_does_not_crash(monkeypatch) -> None:
+    secret = "secret"
+    monkeypatch.setattr(webhook_module.settings, "github_webhook_secret", secret)
+
+    class _FakeResponse:
+        status_code = 422
+
+    class _FakeHTTPStatusError(httpx.HTTPStatusError):
+        def __init__(self) -> None:
+            super().__init__("unprocessable entity", request=httpx.Request("POST", "https://api.github.com"), response=_FakeResponse())
+
+    class _FakeGitHubClient:
+        async def list_pull_request_files(self, *, owner: str, repo: str, pull_number: int):
+            return [
+                {
+                    "filename": "src/app.py",
+                    "status": "modified",
+                    "additions": 4,
+                    "deletions": 1,
+                    "patch": "@@ -1 +1 @@",
+                }
+            ]
+
+        async def create_issue_comment(self, **kwargs):
+            return None
+
+        async def request_pull_reviewers(self, **kwargs):
+            raise _FakeHTTPStatusError()
+
+        async def create_pull_review(self, **kwargs):
+            return None
+
+        async def create_check_run(self, **kwargs):
+            return None
+
+    async def _fake_create_installation_client(payload):
+        return "octo", "repo", _FakeGitHubClient()
+
+    async def _fake_evaluate(self, context):
+        return EvaluationOutcome(
+            decision=DecisionResult(
+                signals=RiskSignals(
+                    breaking_api_change=0.0,
+                    security_sensitive=0.0,
+                    production_infra_change=0.0,
+                    model_risk=0.0,
+                ),
+                computed_risk=0.0,
+                file_risks=[],
+                summary="summary",
+                evidence=[],
+            ),
+            route=RoutingAction(action="request_review", reviewers=["alice"]),
+        )
+
+    monkeypatch.setattr("JevPR.services.pull_request._create_installation_client", _fake_create_installation_client)
+    monkeypatch.setattr("JevPR.services.evaluation.EvaluationService.evaluate", _fake_evaluate)
+
+    client = TestClient(create_app())
+    body = (
+        b'{"action":"opened","repository":{"full_name":"octo/repo"},'
+        b'"installation":{"id":12345},"pull_request":{"number":1,'
+        b'"title":"Update docs","user":{"login":"alice"},"base":{"ref":"main"},'
+        b'"head":{"ref":"feature/docs"},"labels":[]}}'
+    )
+
+    response = client.post(
+        "/webhooks/github",
+        headers={
+            "X-GitHub-Event": "pull_request",
+            "X-Hub-Signature-256": _signature(secret, body),
+        },
+        content=body,
+    )
+
+    assert response.status_code == 200

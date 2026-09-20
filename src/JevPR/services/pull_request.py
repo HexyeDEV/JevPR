@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import logging
 
+import httpx
+
 from JevPR.config import settings
 from JevPR.decisions.context import ChangedFile, PullRequestContext
 from JevPR.decisions.engine import JevDecisionEngine
@@ -32,6 +34,60 @@ def _split_repository_name(repository_name: str) -> tuple[str, str] | None:
         return None
 
     return owner, repo
+
+
+async def _create_installation_client(payload: dict) -> tuple[str, str, GitHubClient] | None:
+    installation_id = payload.get("installation", {}).get("id")
+    repository_name = payload.get("repository", {}).get("full_name", "")
+    repository_parts = _split_repository_name(repository_name)
+    if installation_id is None or repository_parts is None:
+        logger.warning(
+            "github action skipped because installation or repository information is missing",
+            extra={"installation_id": installation_id, "repository": repository_name},
+        )
+        return None
+
+    if settings.github_app_id is None or settings.github_app_private_key is None:
+        logger.warning("github action skipped because app credentials are not configured")
+        return None
+
+    owner, repo = repository_parts
+    client = GitHubClient()
+    installation_token = await client.create_installation_token(
+        app_id=settings.github_app_id,
+        private_key=settings.github_app_private_key,
+        installation_id=installation_id,
+    )
+    return owner, repo, GitHubClient(token=installation_token)
+
+
+async def _load_changed_files(payload: dict, github: GitHubClient, owner: str, repo: str) -> list[ChangedFile]:
+    pull_number = payload.get("pull_request", {}).get("number", 0)
+    file_entries = await github.list_pull_request_files(
+        owner=owner,
+        repo=repo,
+        pull_number=pull_number,
+    )
+    changed_files = [
+        ChangedFile(
+            path=file.get("filename", ""),
+            status=file.get("status", "modified"),
+            additions=file.get("additions", 0),
+            deletions=file.get("deletions", 0),
+            diff=file.get("patch"),
+        )
+        for file in file_entries
+    ]
+
+    logger.info(
+        "pull request files loaded",
+        extra={
+            "repository": payload.get("repository", {}).get("full_name", "unknown/repo"),
+            "number": pull_number,
+            "changed_files": len(changed_files),
+        },
+    )
+    return changed_files
 
 
 def _format_decision_breakdown(decision: DecisionResult) -> str:
@@ -78,32 +134,27 @@ async def _apply_route_to_github(
     context: PullRequestContext,
     route: RoutingAction,
     decision: DecisionResult,
+    github: GitHubClient | None = None,
 ) -> None:
     if route.action == "noop":
         return
 
-    installation_id = payload.get("installation", {}).get("id")
+    if github is None:
+        installation_client = await _create_installation_client(payload)
+        if installation_client is None:
+            return
+        _, _, github = installation_client
+
     repository_name = payload.get("repository", {}).get("full_name", "")
     repository_parts = _split_repository_name(repository_name)
-    if installation_id is None or repository_parts is None:
+    if repository_parts is None:
         logger.warning(
-            "github action skipped because installation or repository information is missing",
-            extra={"installation_id": installation_id, "repository": repository_name},
+            "github action skipped because repository information is missing",
+            extra={"repository": repository_name},
         )
         return
 
-    if settings.github_app_id is None or settings.github_app_private_key is None:
-        logger.warning("github action skipped because app credentials are not configured")
-        return
-
     owner, repo = repository_parts
-    client = GitHubClient()
-    installation_token = await client.create_installation_token(
-        app_id=settings.github_app_id,
-        private_key=settings.github_app_private_key,
-        installation_id=installation_id,
-    )
-    github = GitHubClient(token=installation_token)
 
     route_summary = _build_route_comment(decision, route)
 
@@ -123,12 +174,26 @@ async def _apply_route_to_github(
             body=route_summary,
         )
     elif route.action == "request_review" and route.reviewers:
-        await github.request_pull_reviewers(
-            owner=owner,
-            repo=repo,
-            pull_number=context.number,
-            reviewers=route.reviewers,
-        )
+        try:
+            await github.request_pull_reviewers(
+                owner=owner,
+                repo=repo,
+                pull_number=context.number,
+                reviewers=route.reviewers,
+            )
+        except httpx.HTTPStatusError as exc:
+            if exc.response.status_code == 422:
+                logger.warning(
+                    "github review request rejected by GitHub",
+                    extra={
+                        "repository": context.repository,
+                        "number": context.number,
+                        "reviewers": route.reviewers,
+                        "status_code": exc.response.status_code,
+                    },
+                )
+            else:
+                raise
     elif route.action == "create_check":
         head_sha = payload.get("pull_request", {}).get("head", {}).get("sha")
         if not head_sha:
@@ -192,6 +257,15 @@ async def handle_pull_request_webhook(event_type: str, payload: dict) -> dict[st
         labels=[label.get("name", "") for label in payload.get("pull_request", {}).get("labels", [])],
     )
 
+    installation_client = await _create_installation_client(payload)
+    changed_files: list[ChangedFile] = []
+    github_client: GitHubClient | None = None
+    if installation_client is not None:
+        owner, repo, github_client = installation_client
+        changed_files = await _load_changed_files(payload, github_client, owner, repo)
+
+    context.changed_files = changed_files
+
     logger.info(
         "pull request context built",
         extra={
@@ -207,7 +281,7 @@ async def handle_pull_request_webhook(event_type: str, payload: dict) -> dict[st
     policy: RoutingPolicy = default_policy()
     service = EvaluationService(engine=engine, policy=policy)
     outcome: EvaluationOutcome = await service.evaluate(context)
-    await _apply_route_to_github(payload, context, outcome.route, outcome.decision)
+    await _apply_route_to_github(payload, context, outcome.route, outcome.decision, github_client)
     logger.info(
         "pull request routed",
         extra={

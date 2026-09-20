@@ -25,6 +25,31 @@ class GitHubClient:
             response.raise_for_status()
             return response.json()
 
+    async def list_pull_request_files(
+        self,
+        *,
+        owner: str,
+        repo: str,
+        pull_number: int,
+        per_page: int = 100,
+    ) -> list[dict[str, Any]]:
+        files: list[dict[str, Any]] = []
+        page = 1
+
+        while True:
+            response = await self.get_json(
+                f"/repos/{owner}/{repo}/pulls/{pull_number}/files?per_page={per_page}&page={page}"
+            )
+            if not isinstance(response, list):
+                raise RuntimeError("GitHub pull request files response was not a list")
+
+            files.extend(item for item in response if isinstance(item, dict))
+            if len(response) < per_page:
+                break
+            page += 1
+
+        return files
+
     async def post_json(self, path: str, payload: dict[str, Any]) -> Any:
         async with httpx.AsyncClient(base_url=self.base_url, headers=self._headers(), timeout=30) as client:
             response = await client.post(path, json=payload)
