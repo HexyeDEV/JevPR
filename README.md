@@ -15,7 +15,7 @@ When a pull request is opened or updated, the app ingests the GitHub webhook, no
 
 ## Configuration
 
-Runtime settings are loaded from environment variables and an optional YAML file at `review-routing.yml`.
+Runtime settings are loaded from environment variables and an optional YAML file at `review-routing.yml`. (TODO: Make review-routing.yml different per repository)
 
 The YAML file controls both the action mapping and the GitHub reviewers that may be assigned by policy.
 
