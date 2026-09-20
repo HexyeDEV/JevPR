@@ -15,7 +15,7 @@ When a pull request is opened or updated, the app ingests the GitHub webhook, no
 
 ## Configuration
 
-Runtime settings are loaded from environment variables and an optional YAML file at `review-routing.yml`. (TODO: Make review-routing.yml different per repository)
+Runtime settings are loaded from environment variables and an optional YAML file at `.github/jevpr.yml` in the repository. If the YAML file is not present, a default policy is used.
 
 The YAML file controls both the action mapping and the GitHub reviewers that may be assigned by policy.
 
@@ -54,6 +54,13 @@ Port rules in Docker mode:
 - `REDIS_PORT` controls the host port mapped to the Redis container. Inside Compose, other services reach it at `redis:6379`.
 
 In Docker mode, the app container uses `DATABASE_URL=postgresql+psycopg://jevpr:jevpr@db:5432/jevpr` and `REDIS_URL=redis://redis:6379/0`. The localhost versions in `.env` are for running on your machine outside Docker.
+
+Permissions required for the GitHub App:
+- Checks: Read & Write
+- Contents: Read
+- Issues: Read & Write
+- Merge queues: Read & Write
+- Pull requests: Read & Write
 
 License: Apache-2.0
 
