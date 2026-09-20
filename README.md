@@ -54,3 +54,5 @@ Port rules in Docker mode:
 In Docker mode, the app container uses `DATABASE_URL=postgresql+psycopg://jevpr:jevpr@db:5432/jevpr` and `REDIS_URL=redis://redis:6379/0`. The localhost versions in `.env` are for running on your machine outside Docker.
 
 License: Apache-2.0
+
+Don't forget to leave a Star!
