@@ -297,7 +297,7 @@ async def handle_pull_request_webhook(event_type: str, payload: dict) -> dict[st
         repo=context.repository.split("/")[1],
         payload=payload
     )
-    has_default_policy = policy == default_policy()
+    has_default_policy = policy.config == default_policy().config
     service = EvaluationService(engine=engine, policy=policy)
     outcome: EvaluationOutcome = await service.evaluate(context)
     await _apply_route_to_github(payload, context, outcome.route, outcome.decision, github_client, has_default_policy)
