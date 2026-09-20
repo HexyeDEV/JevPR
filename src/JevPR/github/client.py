@@ -139,3 +139,26 @@ class GitHubClient:
             payload["details_url"] = details_url
 
         return await self.post_json(f"/repos/{owner}/{repo}/check-runs", payload)
+
+    async def get_file_content(
+        self,
+        *,
+        owner: str,
+        repo: str,
+        path: str
+    ) -> str:
+        response = await self.get_json(f"/repos/{owner}/{repo}/contents/{path}")
+        if not isinstance(response, dict):
+            raise RuntimeError("GitHub file content response was not a dict")
+
+        content = response.get("content")
+        if not isinstance(content, str):
+            raise RuntimeError("GitHub file content response did not include a string content")
+
+        encoding = response.get("encoding")
+        if encoding != "base64":
+            raise RuntimeError(f"GitHub file content response had unexpected encoding: {encoding}")
+
+        import base64
+
+        return base64.b64decode(content).decode("utf-8")
