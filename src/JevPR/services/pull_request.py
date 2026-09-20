@@ -294,7 +294,8 @@ async def handle_pull_request_webhook(event_type: str, payload: dict) -> dict[st
     engine = JevDecisionEngine(provider=JevProvider())
     policy: RoutingPolicy = await get_routing_policy(
         owner=context.repository.split("/")[0],
-        repo=context.repository.split("/")[1]
+        repo=context.repository.split("/")[1],
+        payload=payload
     )
     has_default_policy = policy == default_policy()
     service = EvaluationService(engine=engine, policy=policy)

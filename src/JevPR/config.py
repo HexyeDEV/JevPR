@@ -3,6 +3,7 @@ from __future__ import annotations
 from functools import lru_cache
 from pathlib import Path
 from typing import Literal
+from JevPR.github.client import GitHubClient
 
 import yaml
 from pydantic import BaseModel, Field
@@ -50,13 +51,17 @@ class Settings(BaseSettings):
         data = yaml.safe_load(config_path.read_text(encoding="utf-8")) or {}
         return RoutingConfig.model_validate(data)
 
-    async def load_routing_config_from_repo(self, owner: str, repo: str) -> RoutingConfig:
-        from JevPR.github.client import GitHubClient
-
+    async def load_routing_config_from_repo(self, owner: str, repo: str, payload: dict) -> RoutingConfig:
         if not self.github_app_id or not self.github_app_private_key:
             raise RuntimeError("GitHub app credentials are not configured")
 
-        client = GitHubClient(app_id=self.github_app_id, private_key=self.github_app_private_key)
+        client = GitHubClient()
+        installation_token = await client.create_installation_token(
+            app_id=settings.github_app_id, 
+            private_key=settings.github_app_private_key,
+            installation_id=payload.get("installation", {}).get("id")
+        )
+        client = GitHubClient(token=installation_token)
         try:
             content = await client.get_file_content(owner=owner, repo=repo, path=".github/jevpr.yml")
         except Exception:

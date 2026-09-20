@@ -6,6 +6,7 @@ from dataclasses import dataclass, field
 from JevPR.config import ActionConfig, RoutingConfig
 from JevPR.decisions.models import DecisionLevel, DecisionResult, RiskSignals
 
+
 logger = logging.getLogger(__name__)
 
 
@@ -52,10 +53,10 @@ def default_policy() -> RoutingPolicy:
 
     return RoutingPolicy(settings.load_routing_config())
 
-async def get_routing_policy(owner: str, repo: str) -> RoutingPolicy:
+async def get_routing_policy(owner: str, repo: str, payload: dict) -> RoutingPolicy:
     from JevPR.config import settings
 
-    routing_config = await settings.load_routing_config_from_repo(owner, repo)
+    routing_config = await settings.load_routing_config_from_repo(owner, repo, payload)
     return RoutingPolicy(routing_config)
 
 
