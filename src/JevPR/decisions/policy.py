@@ -6,7 +6,6 @@ from dataclasses import dataclass, field
 from JevPR.config import ActionConfig, RoutingConfig
 from JevPR.decisions.models import DecisionLevel, DecisionResult, RiskSignals
 
-
 logger = logging.getLogger(__name__)
 
 
