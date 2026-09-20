@@ -63,7 +63,7 @@ class DecisionResult:
     signals: RiskSignals
     computed_risk: float
     file_risks: list[FileRisk] = field(default_factory=list)
-    explanation: str = ""
+    summary: str = ""
     evidence: list[DecisionEvidence] = field(default_factory=list)
 
     @classmethod
@@ -96,7 +96,7 @@ class DecisionResult:
         else:
             files_summary = "no file-level hotspots"
 
-        explanation = (
+        summary = (
             f"Composite risk {computed_risk:.2f}/10 derived from model risk "
             f"{signals.model_risk:.2f}/10, signal risk {signal_risk:.2f}/10, and "
             f"file risk {file_risk:.2f}/10. Most risky files: {files_summary}."
@@ -108,7 +108,7 @@ class DecisionResult:
             file_risks=sorted(
                 file_risks, key=lambda file_risk_item: file_risk_item.score, reverse=True
             ),
-            explanation=explanation,
+            summary=summary,
             evidence=evidence or [],
         )
 

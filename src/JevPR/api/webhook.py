@@ -11,6 +11,7 @@ from JevPR.services.pull_request import handle_pull_request_webhook
 
 router = APIRouter(prefix="/webhooks", tags=["webhooks"])
 logger = logging.getLogger(__name__)
+SUPPORTED_GITHUB_EVENTS = {"pull_request"}
 
 
 def _verify_github_signature(body: bytes, signature_header: str | None) -> None:
@@ -55,7 +56,7 @@ async def github_webhook(
         extra={"event": x_github_event, "payload_size": len(body)},
     )
 
-    if x_github_event not in {"pull_request", "pull_request_review", "check_suite"}:
+    if x_github_event not in SUPPORTED_GITHUB_EVENTS:
         logger.info("github webhook ignored", extra={"event": x_github_event})
         raise HTTPException(status_code=status.HTTP_202_ACCEPTED, detail="ignored event")
 

@@ -2,11 +2,15 @@ from __future__ import annotations
 
 import logging
 
+from JevPR.config import settings
 from JevPR.decisions.context import ChangedFile, PullRequestContext
 from JevPR.decisions.engine import JevDecisionEngine
+from JevPR.decisions.policy import RoutingAction
 from JevPR.decisions.policy import RoutingPolicy, default_policy
+from JevPR.decisions.models import DecisionResult
+from JevPR.github.client import GitHubClient
 from JevPR.providers.jev import JevProvider
-from JevPR.services.evaluation import EvaluationService
+from JevPR.services.evaluation import EvaluationOutcome, EvaluationService
 
 
 logger = logging.getLogger(__name__)
@@ -20,6 +24,140 @@ def _is_review_worthy_pull_request(payload: dict) -> bool:
         return True
 
     return False
+
+
+def _split_repository_name(repository_name: str) -> tuple[str, str] | None:
+    owner, separator, repo = repository_name.partition("/")
+    if not separator or not owner or not repo:
+        return None
+
+    return owner, repo
+
+
+def _format_decision_breakdown(decision: DecisionResult) -> str:
+    lines = [
+        "What Jev said:",
+        f"- Composite risk: {decision.computed_risk:.2f}/10",
+        f"- Level: {decision.level.value}",
+        f"- Assessment summary: {decision.summary}",
+        "- Signals:",
+        f"  - Breaking API change: {decision.signals.breaking_api_change:.2f}/1.0",
+        f"  - Security sensitive: {decision.signals.security_sensitive:.2f}/1.0",
+        f"  - Production infra change: {decision.signals.production_infra_change:.2f}/1.0",
+        f"  - Model risk: {decision.signals.model_risk:.2f}/10",
+    ]
+
+    if decision.evidence:
+        lines.append("- Evidence:")
+        for item in decision.evidence:
+            lines.append(f"  - {item.key}: {item.value}")
+
+    top_files = decision.top_risky_files()
+    if top_files:
+        lines.append("- Top risky files:")
+        for file_risk in top_files:
+            lines.append(f"  - {file_risk.path}: {file_risk.score:.2f}/10")
+
+    return "\n".join(lines)
+
+
+def _build_route_comment(decision: DecisionResult, route: RoutingAction) -> str:
+    route_summary = f"JevPR routed this pull request as `{route.action}`."
+    if route.reviewers:
+        route_summary = f"{route_summary} Reviewers: {', '.join(route.reviewers)}."
+    if route.codeowners_only:
+        route_summary = f"{route_summary} Codeowners only: yes."
+    if route.check_name:
+        route_summary = f"{route_summary} Check: {route.check_name}."
+
+    return f"{route_summary}\n\n{_format_decision_breakdown(decision)}"
+
+
+async def _apply_route_to_github(
+    payload: dict,
+    context: PullRequestContext,
+    route: RoutingAction,
+    decision: DecisionResult,
+) -> None:
+    if route.action == "noop":
+        return
+
+    installation_id = payload.get("installation", {}).get("id")
+    repository_name = payload.get("repository", {}).get("full_name", "")
+    repository_parts = _split_repository_name(repository_name)
+    if installation_id is None or repository_parts is None:
+        logger.warning(
+            "github action skipped because installation or repository information is missing",
+            extra={"installation_id": installation_id, "repository": repository_name},
+        )
+        return
+
+    if settings.github_app_id is None or settings.github_app_private_key is None:
+        logger.warning("github action skipped because app credentials are not configured")
+        return
+
+    owner, repo = repository_parts
+    client = GitHubClient()
+    installation_token = await client.create_installation_token(
+        app_id=settings.github_app_id,
+        private_key=settings.github_app_private_key,
+        installation_id=installation_id,
+    )
+    github = GitHubClient(token=installation_token)
+
+    route_summary = _build_route_comment(decision, route)
+
+    await github.create_issue_comment(
+        owner=owner,
+        repo=repo,
+        issue_number=context.number,
+        body=route_summary,
+    )
+
+    if route.action == "approve":
+        await github.create_pull_review(
+            owner=owner,
+            repo=repo,
+            pull_number=context.number,
+            event="APPROVE",
+            body=route_summary,
+        )
+    elif route.action == "request_review" and route.reviewers:
+        await github.request_pull_reviewers(
+            owner=owner,
+            repo=repo,
+            pull_number=context.number,
+            reviewers=route.reviewers,
+        )
+    elif route.action == "create_check":
+        head_sha = payload.get("pull_request", {}).get("head", {}).get("sha")
+        if not head_sha:
+            logger.warning(
+                "github check skipped because pull request head sha is missing",
+                extra={"repository": context.repository, "number": context.number},
+            )
+            return
+
+        check_name = route.check_name or "JevPR"
+        await github.create_check_run(
+            owner=owner,
+            repo=repo,
+            name=check_name,
+            head_sha=head_sha,
+            conclusion="neutral",
+            title=check_name,
+            summary=route_summary,
+            details_url=payload.get("pull_request", {}).get("html_url"),
+        )
+
+    logger.info(
+        "github action applied",
+        extra={
+            "repository": context.repository,
+            "number": context.number,
+            "action": route.action,
+        },
+    )
 
 
 async def handle_pull_request_webhook(event_type: str, payload: dict) -> dict[str, str]:
@@ -68,13 +206,14 @@ async def handle_pull_request_webhook(event_type: str, payload: dict) -> dict[st
     engine = JevDecisionEngine(provider=JevProvider())
     policy: RoutingPolicy = default_policy()
     service = EvaluationService(engine=engine, policy=policy)
-    route = await service.evaluate(context)
+    outcome: EvaluationOutcome = await service.evaluate(context)
+    await _apply_route_to_github(payload, context, outcome.route, outcome.decision)
     logger.info(
         "pull request routed",
         extra={
             "repository": context.repository,
             "number": context.number,
-            "route_action": route.action,
+            "route_action": outcome.route.action,
         },
     )
-    return {"status": "processed", "action": route.action}
+    return {"status": "processed", "action": outcome.route.action}
