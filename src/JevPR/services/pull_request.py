@@ -11,10 +11,27 @@ from JevPR.services.evaluation import EvaluationService
 
 logger = logging.getLogger(__name__)
 
+REVIEW_WORTHY_PR_ACTIONS = {"opened", "reopened", "synchronize", "ready_for_review"}
+
+
+def _is_review_worthy_pull_request(payload: dict) -> bool:
+    action = payload.get("action")
+    if action in REVIEW_WORTHY_PR_ACTIONS:
+        return True
+
+    return False
+
 
 async def handle_pull_request_webhook(event_type: str, payload: dict) -> dict[str, str]:
     if event_type != "pull_request":
         logger.info("non pull_request event ignored in service layer", extra={"event": event_type})
+        return {"status": "ignored"}
+
+    if not _is_review_worthy_pull_request(payload):
+        logger.info(
+            "pull request webhook ignored because action is not review-worthy",
+            extra={"action": payload.get("action")},
+        )
         return {"status": "ignored"}
 
     context = PullRequestContext(
@@ -42,6 +59,7 @@ async def handle_pull_request_webhook(event_type: str, payload: dict) -> dict[st
         extra={
             "repository": context.repository,
             "number": context.number,
+            "action": payload.get("action"),
             "changed_files": len(context.changed_files),
             "labels": len(context.labels),
         },
@@ -53,6 +71,10 @@ async def handle_pull_request_webhook(event_type: str, payload: dict) -> dict[st
     route = await service.evaluate(context)
     logger.info(
         "pull request routed",
-        extra={"repository": context.repository, "number": context.number, "action": route.action},
+        extra={
+            "repository": context.repository,
+            "number": context.number,
+            "route_action": route.action,
+        },
     )
     return {"status": "processed", "action": route.action}

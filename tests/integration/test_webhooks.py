@@ -51,3 +51,26 @@ def test_github_webhook_accepts_valid_signature(monkeypatch) -> None:
     )
 
     assert response.status_code == 200
+
+
+def test_github_webhook_ignores_non_review_worthy_pr_action(monkeypatch) -> None:
+    secret = "secret"
+    monkeypatch.setattr(webhook_module.settings, "github_webhook_secret", secret)
+    client = TestClient(create_app())
+    payload = {
+        "action": "edited",
+        "repository": {"full_name": "octo/repo"},
+        "pull_request": {"number": 1, "title": "Update docs", "user": {"login": "alice"}},
+    }
+    body = b'{"action":"edited","repository":{"full_name":"octo/repo"},"pull_request":{"number":1,"title":"Update docs","user":{"login":"alice"}}}'
+
+    response = client.post(
+        "/webhooks/github",
+        headers={
+            "X-GitHub-Event": "pull_request",
+            "X-Hub-Signature-256": _signature(secret, body),
+        },
+        content=body,
+    )
+
+    assert response.status_code == 202
