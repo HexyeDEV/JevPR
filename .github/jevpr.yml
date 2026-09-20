@@ -1,0 +1,16 @@
+reviewers:
+  - username: "HexyeDEV"
+    github_id: 65314629
+
+actions:
+  LOW:
+    action: approve
+  NORMAL:
+    action: request_review
+    reviewers:
+      - HexyeDEV
+  SPECIALIST:
+    action: request_review
+    reviewers:
+      - HexyeDEV
+    codeowners_only: true
