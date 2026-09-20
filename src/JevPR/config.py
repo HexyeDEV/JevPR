@@ -37,7 +37,7 @@ class Settings(BaseSettings):
     github_app_id: int | None = None
     github_app_private_key: str | None = None
     github_webhook_secret: str | None = None
-    jev_api_key: str | None = None
+    typesafe_api_key: str | None = None
 
     def load_routing_config(self) -> RoutingConfig:
         config_path = self.config_path
