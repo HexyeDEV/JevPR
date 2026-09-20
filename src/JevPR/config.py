@@ -50,6 +50,21 @@ class Settings(BaseSettings):
         data = yaml.safe_load(config_path.read_text(encoding="utf-8")) or {}
         return RoutingConfig.model_validate(data)
 
+    async def load_routing_config_from_repo(self, owner: str, repo: str) -> RoutingConfig:
+        from JevPR.github.client import GitHubClient
+
+        if not self.github_app_id or not self.github_app_private_key:
+            raise RuntimeError("GitHub app credentials are not configured")
+
+        client = GitHubClient(app_id=self.github_app_id, private_key=self.github_app_private_key)
+        try:
+            content = await client.get_file_content(owner=owner, repo=repo, path=".github/jevpr.yml")
+        except Exception:
+            return self.load_routing_config()
+
+        data = yaml.safe_load(content) or {}
+        return RoutingConfig.model_validate(data)
+
 
 @lru_cache(maxsize=1)
 def get_settings() -> Settings:

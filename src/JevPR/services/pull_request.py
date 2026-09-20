@@ -135,6 +135,7 @@ async def _apply_route_to_github(
     route: RoutingAction,
     decision: DecisionResult,
     github: GitHubClient | None = None,
+    has_default_policy: bool = True
 ) -> None:
     if route.action == "noop":
         return
@@ -157,6 +158,19 @@ async def _apply_route_to_github(
     owner, repo = repository_parts
 
     route_summary = _build_route_comment(decision, route)
+
+    if has_default_policy:
+        route_summary = f"""{route_summary}
+        
+        *Note: This routing was determined by the default policy.*
+        The repository does not have a custom routing configuration.
+
+        Create one at `.github/jevpr.yml` in the repository to customize routing behavior.
+        Configuration Template:
+
+        ```yaml
+        {settings.config_path.read_text(encoding="utf-8")}
+        ```"""
 
     await github.create_issue_comment(
         owner=owner,
@@ -278,10 +292,14 @@ async def handle_pull_request_webhook(event_type: str, payload: dict) -> dict[st
     )
 
     engine = JevDecisionEngine(provider=JevProvider())
-    policy: RoutingPolicy = default_policy()
+    policy: RoutingPolicy = await settings.load_routing_config_from_repo(
+        owner=context.repository.split("/")[0],
+        repo=context.repository.split("/")[1]
+    )
+    has_default_policy = policy == default_policy()
     service = EvaluationService(engine=engine, policy=policy)
     outcome: EvaluationOutcome = await service.evaluate(context)
-    await _apply_route_to_github(payload, context, outcome.route, outcome.decision, github_client)
+    await _apply_route_to_github(payload, context, outcome.route, outcome.decision, github_client, has_default_policy)
     logger.info(
         "pull request routed",
         extra={
