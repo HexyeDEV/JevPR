@@ -1,0 +1,50 @@
+services:
+  api:
+    build: .
+    env_file:
+      - .env
+    environment:
+      JEVPR_CONFIG_PATH: /app/review-routing.yml
+      DATABASE_URL: postgresql+psycopg://jevpr:jevpr@db:5432/jevpr
+      REDIS_URL: redis://redis:6379/0
+    volumes:
+      - ./review-routing.yml:/app/review-routing.yml:ro
+    ports:
+      - "${API_PORT:-8000}:8000"
+    depends_on:
+      - db
+      - redis
+
+  worker:
+    build: .
+    command: celery -A JevPR.workers.celery.celery_app worker --loglevel=INFO
+    env_file:
+      - .env
+    environment:
+      JEVPR_CONFIG_PATH: /app/review-routing.yml
+      DATABASE_URL: postgresql+psycopg://jevpr:jevpr@db:5432/jevpr
+      REDIS_URL: redis://redis:6379/0
+    volumes:
+      - ./review-routing.yml:/app/review-routing.yml:ro
+    depends_on:
+      - db
+      - redis
+
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: jevpr
+      POSTGRES_USER: jevpr
+      POSTGRES_PASSWORD: jevpr
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+
+volumes:
+  pgdata:

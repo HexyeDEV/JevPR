@@ -1,0 +1,18 @@
+reviewers:
+  - username: "alice"
+    github_id: 1001
+  - username: "bob"
+    github_id: 1002
+
+actions:
+  LOW:
+    action: approve
+  NORMAL:
+    action: request_review
+    reviewers:
+      - alice
+  SPECIALIST:
+    action: request_review
+    reviewers:
+      - bob
+    codeowners_only: true
