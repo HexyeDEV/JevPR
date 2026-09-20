@@ -9,6 +9,7 @@ import yaml
 from pydantic import BaseModel, Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+
 class ReviewerConfig(BaseModel):
     username: str
     github_id: int | None = None
