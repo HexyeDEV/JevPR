@@ -4,7 +4,7 @@ services:
     env_file:
       - .env
     environment:
-      JEVPR_CONFIG_PATH: /app/review-routing.yml
+      CONFIG_PATH: /app/review-routing.yml
       DATABASE_URL: postgresql+psycopg://jevpr:jevpr@db:5432/jevpr
       REDIS_URL: redis://redis:6379/0
     volumes:
@@ -21,7 +21,7 @@ services:
     env_file:
       - .env
     environment:
-      JEVPR_CONFIG_PATH: /app/review-routing.yml
+      CONFIG_PATH: /app/review-routing.yml
       DATABASE_URL: postgresql+psycopg://jevpr:jevpr@db:5432/jevpr
       REDIS_URL: redis://redis:6379/0
     volumes:

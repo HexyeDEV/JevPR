@@ -27,7 +27,7 @@ class RoutingConfig(BaseModel):
 
 
 class Settings(BaseSettings):
-    model_config = SettingsConfigDict(env_prefix="JEVPR_", env_file=".env", extra="ignore")
+    model_config = SettingsConfigDict(env_prefix="", env_file=".env", extra="ignore")
 
     env: str = "development"
     log_level: str = "INFO"
@@ -37,7 +37,6 @@ class Settings(BaseSettings):
     github_app_id: int | None = None
     github_app_private_key: str | None = None
     github_webhook_secret: str | None = None
-    jev_api_url: str | None = None
     jev_api_key: str | None = None
 
     def load_routing_config(self) -> RoutingConfig:
