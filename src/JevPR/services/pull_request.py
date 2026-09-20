@@ -14,6 +14,8 @@ from JevPR.github.client import GitHubClient
 from JevPR.providers.jev import JevProvider
 from JevPR.services.evaluation import EvaluationOutcome, EvaluationService
 
+import textwrap
+
 
 logger = logging.getLogger(__name__)
 
@@ -160,18 +162,18 @@ async def _apply_route_to_github(
     route_summary = _build_route_comment(decision, route)
 
     if has_default_policy:
-        route_summary = f"""{route_summary}
-        
+        route_summary = textwrap.dedent(f"""\
+            {route_summary}
 
-        *Note: This routing was determined by the default policy.*
-        The repository does not have a custom routing configuration.
+            *Note: This routing was determined by the default policy.*
+            The repository does not have a custom routing configuration.
 
-        Create one at `.github/jevpr.yml` in the repository to customize routing behavior.
-        Configuration Template:
+            Create one at `.github/jevpr.yml` in the repository to customize routing behavior.
+            Configuration Template:
 
         ```yaml
-        {settings.config_path.read_text(encoding="utf-8")}
-        ```"""
+            {settings.config_path.read_text(encoding="utf-8")}
+        ```""")
 
     await github.create_issue_comment(
         owner=owner,
