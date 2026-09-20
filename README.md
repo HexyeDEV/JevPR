@@ -43,7 +43,7 @@ actions:
 
 ## Docker
 
-Use `docker compose up --build` to start the API, worker, PostgreSQL, and Redis.
+Use `docker compose up -d --build` to start the API, worker, PostgreSQL, and Redis.
 
 Port rules in Docker mode:
 
