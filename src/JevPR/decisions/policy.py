@@ -53,6 +53,12 @@ def default_policy() -> RoutingPolicy:
 
     return RoutingPolicy(settings.load_routing_config())
 
+async def get_routing_policy(owner: str, repo: str, payload: dict) -> RoutingPolicy:
+    from JevPR.config import settings
+
+    routing_config = await settings.load_routing_config_from_repo(owner, repo, payload)
+    return RoutingPolicy(routing_config)
+
 
 def summarize_route(level: DecisionLevel, policy: RoutingPolicy) -> RoutingAction:
     score_map = {DecisionLevel.LOW: 2.0, DecisionLevel.NORMAL: 5.0, DecisionLevel.SPECIALIST: 8.5}
