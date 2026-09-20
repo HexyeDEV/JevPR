@@ -147,7 +147,13 @@ class GitHubClient:
         repo: str,
         path: str
     ) -> str:
-        response = await self.get_json(f"/repos/{owner}/{repo}/contents/{path}")
+        response = None
+        try:
+            response = await self.get_json(f"/repos/{owner}/{repo}/contents/{path}")
+        except httpx.HTTPStatusError as e:
+            if e.response.status_code == 404:
+                raise RuntimeError(f"GitHub file content not found: {owner}/{repo}/{path}")
+            raise
         if not isinstance(response, dict):
             raise RuntimeError("GitHub file content response was not a dict")
 
