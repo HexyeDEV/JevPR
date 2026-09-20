@@ -52,3 +52,5 @@ Port rules in Docker mode:
 - `REDIS_PORT` controls the host port mapped to the Redis container. Inside Compose, other services reach it at `redis:6379`.
 
 In Docker mode, the app container uses `DATABASE_URL=postgresql+psycopg://jevpr:jevpr@db:5432/jevpr` and `REDIS_URL=redis://redis:6379/0`. The localhost versions in `.env` are for running on your machine outside Docker.
+
+License: Apache-2.0
