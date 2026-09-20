@@ -12,7 +12,7 @@ from JevPR.decisions.policy import RoutingPolicy, default_policy
 from JevPR.decisions.models import DecisionResult
 from JevPR.github.client import GitHubClient
 from JevPR.providers.jev import JevProvider
-from JevPR.services.evaluation import EvaluationOutcome, EvaluationService
+from JevPR.services.evaluation import EvaluationOutcome, EvaluationService\
 
 
 logger = logging.getLogger(__name__)
@@ -161,16 +161,16 @@ async def _apply_route_to_github(
 
     if has_default_policy:
         route_summary = f"""{route_summary}
-        
-        *Note: This routing was determined by the default policy.*
-        The repository does not have a custom routing configuration.
 
-        Create one at `.github/jevpr.yml` in the repository to customize routing behavior.
-        Configuration Template:
+*Note: This routing was determined by the default policy.*
+The repository does not have a custom routing configuration.
 
-        ```yaml
-        {settings.config_path.read_text(encoding="utf-8")}
-        ```"""
+Create one at `.github/jevpr.yml` in the repository to customize routing behavior.
+Configuration Template:
+
+```yaml
+{settings.config_path.read_text(encoding="utf-8")}
+```"""
 
     await github.create_issue_comment(
         owner=owner,
@@ -297,7 +297,7 @@ async def handle_pull_request_webhook(event_type: str, payload: dict) -> dict[st
         repo=context.repository.split("/")[1],
         payload=payload
     )
-    has_default_policy = policy == default_policy()
+    has_default_policy = policy.config == default_policy().config
     service = EvaluationService(engine=engine, policy=policy)
     outcome: EvaluationOutcome = await service.evaluate(context)
     await _apply_route_to_github(payload, context, outcome.route, outcome.decision, github_client, has_default_policy)
