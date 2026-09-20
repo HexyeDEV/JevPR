@@ -41,6 +41,8 @@ actions:
 2. Install the package in editable mode with dev dependencies.
 3. Start the API with `uvicorn JevPR.main:app --reload`.
 
+IT IS HIGHLY RECOMMENDED TO DEPLOY WITH DOCKER
+
 ## Docker
 
 Use `docker compose up -d --build` to start the API, worker, PostgreSQL, and Redis.
