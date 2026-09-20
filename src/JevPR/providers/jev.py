@@ -21,8 +21,7 @@ RISK_SCORE_CRITERIA = [
     "6 - medium-high risk",
     "7 - high risk",
     "8 - very high risk",
-    "9 - severe risk",
-    "10 - critical risk",
+    "9 - critical risk",
 ]
 
 
