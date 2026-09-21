@@ -1,5 +1,7 @@
 # JevPR
 
+[![Listed in Awesome Jev](https://awesomejev.vercel.app/badge.svg)](https://awesomejev.vercel.app/p/jevpr/)
+
 JevPR is a GitHub App that routes pull-request review work using [Jev By TypeSafe](https://typesafe.ai/) as the decision engine.
 
 When a pull request is opened or updated, the app ingests the GitHub webhook, normalizes the pull request context, sends it to Jev, and receives a structured decision such as `LOW`, `NORMAL`, or `SPECIALIST`. A deterministic policy layer then maps that decision to an action like auto-approval, a request for review, or a check-run update.
