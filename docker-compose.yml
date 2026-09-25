@@ -1,6 +1,7 @@
 services:
   api:
     build: .
+    image: hexye/jevpr-api
     env_file:
       - .env
     environment:
@@ -17,6 +18,7 @@ services:
 
   worker:
     build: .
+    image: hexye/jevpr-worker
     command: celery -A JevPR.workers.celery.celery_app worker --loglevel=INFO
     env_file:
       - .env
